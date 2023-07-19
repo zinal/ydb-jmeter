@@ -13,16 +13,19 @@ import org.apache.jmeter.testelement.AbstractTestElement;
 import org.apache.jmeter.testelement.TestStateListener;
 import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.save.CSVSaveService;
+import org.apache.jmeter.threads.JMeterVariables;
 
 import tech.ydb.core.grpc.GrpcReadStream;
 import tech.ydb.table.SessionRetryContext;
 import tech.ydb.table.query.DataQueryResult;
 import tech.ydb.table.query.Params;
 import tech.ydb.table.result.ResultSetReader;
+import tech.ydb.table.result.ValueReader;
 import tech.ydb.table.settings.ExecuteDataQuerySettings;
 import tech.ydb.table.settings.ExecuteScanQuerySettings;
 import tech.ydb.table.settings.ExecuteSchemeQuerySettings;
 import tech.ydb.table.transaction.TxControl;
+import tech.ydb.table.values.Type;
 
 /**
  *
@@ -32,8 +35,9 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement impleme
 
     private static final long serialVersionUID = 1L;
 
+    protected static final java.nio.charset.Charset CHARSET = StandardCharsets.UTF_8;
+
     private static final Logger LOG = LoggerFactory.getLogger(AbstractYdbTestElement.class);
-    private static final java.nio.charset.Charset CHARSET = StandardCharsets.UTF_8;
     private static final String COMMA = ",";
     private static final char COMMA_CHAR = ',';
 
@@ -59,7 +63,6 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement impleme
     private String queryArgumentsTypes = "";
     private String variableNames = "";
     private String resultSetHandler = RS_STORE_AS_STRING;
-    private String resultVariable = "";
     private String queryTimeout = "";
     private String resultSetMaxRows = "";
 
@@ -71,11 +74,8 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement impleme
      *
      * @param src a {@link SessionRetryContext}
      * @return the result of the execute command
-     * @throws IOException when I/O error occurs
-     * @throws UnsupportedOperationException if the user provided incorrect query type
      */
-    protected byte[] execute(SessionRetryContext src)
-            throws IOException, UnsupportedOperationException {
+    protected byte[] execute(SessionRetryContext src) {
         return execute(src,  new SampleResult());
     }
 
@@ -86,11 +86,8 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement impleme
      * @param src a {@link SessionRetryContext}
      * @param sample a {@link SampleResult} to save the latency
      * @return the result of the execute command
-     * @throws IOException when I/O error occurs
-     * @throws UnsupportedOperationException if the user provided incorrect query type
      */
-    protected byte[] execute(SessionRetryContext src, SampleResult sample)
-            throws IOException, UnsupportedOperationException {
+    protected byte[] execute(SessionRetryContext src, SampleResult sample) {
         LOG.debug("executing ydb: {}", getQuery());
         // Based on query return value, get results
         final String qt = getQueryType();
@@ -115,6 +112,7 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement impleme
         sample.latencyEnd();
         final StringBuilder sb = new StringBuilder();
         final int nrs = dqr.getResultSetCount();
+        int varPos = 0;
         for (int irs = 0; irs < nrs; irs++) {
             ResultSetReader rsr = dqr.getResultSet(irs);
             sb.append("** Result set #").append(irs+1)
@@ -127,7 +125,7 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement impleme
                 appendColumns(sb, rsr);
                 appendRows(sb, rsr, 0);
             }
-            storeVariables(rsr);
+            varPos = storeVariables(rsr, varPos);
         }
         return sb.toString().getBytes(CHARSET);
     }
@@ -167,7 +165,7 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement impleme
                 }
                 if (sqc.storeVariables) {
                     sqc.storeVariables = false;
-                    storeVariables(rsr);
+                    storeVariables(rsr, 0);
                 }
                 sqc.totalRows += rsr.getRowCount();
             });
@@ -286,7 +284,7 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement impleme
             }
             sb.append("\n");
             nrow += 1;
-            if (maxRows >= 0L && totalRows + nrow >= maxRows) {
+            if (maxRows >= 0L && (totalRows + nrow) >= maxRows) {
                 break;
             }
         }
@@ -294,8 +292,39 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement impleme
         return totalRows;
     }
 
-    private void storeVariables(ResultSetReader rsr) {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+    private boolean isValuePresent(ValueReader vr) {
+        if (vr==null) {
+            return false;
+        }
+        if (Type.Kind.OPTIONAL.equals(vr.getType().getKind())) {
+            return vr.getValue().asOptional().isPresent();
+        }
+        return true;
+    }
+
+    private int storeVariables(ResultSetReader rsr, int varPos) {
+        if (rsr.getRowCount()==0)
+            return 0;
+        String[] varnames = getVariableNames().split(COMMA);
+        if (varnames.length == 0)
+            return 0;
+        rsr.setRowIndex(0);
+        JMeterVariables jmvars = getThreadContext().getVariables();
+        int pos = varPos;
+        for (; (pos<varnames.length) && (pos < rsr.getColumnCount()); pos++) {
+            String name = varnames[pos].trim();
+            if (name.length()==0)
+                continue;
+            ValueReader vr = rsr.getColumn(pos);
+            if (isValuePresent(vr)) {
+                final StringBuilder sb = new StringBuilder();
+                vr.toString(sb);
+                jmvars.putObject(name, sb.toString());
+            } else {
+                jmvars.putObject(name, null);
+            }
+        }
+        return pos;
     }
 
     /**
@@ -454,20 +483,6 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement impleme
      */
     public void setResultSetHandler(String resultSetHandler) {
         this.resultSetHandler = resultSetHandler;
-    }
-
-    /**
-     * @return the resultVariable
-     */
-    public String getResultVariable() {
-        return resultVariable ;
-    }
-
-    /**
-     * @param resultVariable the variable name in which results will be stored
-     */
-    public void setResultVariable(String resultVariable) {
-        this.resultVariable = resultVariable;
     }
 
     /**
