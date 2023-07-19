@@ -3,7 +3,6 @@ package tech.ydb.jmeter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,11 +13,8 @@ import org.apache.jmeter.testelement.AbstractTestElement;
 import org.apache.jmeter.testelement.TestStateListener;
 import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.save.CSVSaveService;
-import org.apache.jmeter.util.JMeterUtils;
-import tech.ydb.core.Status;
-import tech.ydb.core.UnexpectedResultException;
-import tech.ydb.core.grpc.GrpcReadStream;
 
+import tech.ydb.core.grpc.GrpcReadStream;
 import tech.ydb.table.SessionRetryContext;
 import tech.ydb.table.query.DataQueryResult;
 import tech.ydb.table.query.Params;
@@ -27,9 +23,6 @@ import tech.ydb.table.settings.ExecuteDataQuerySettings;
 import tech.ydb.table.settings.ExecuteScanQuerySettings;
 import tech.ydb.table.settings.ExecuteSchemeQuerySettings;
 import tech.ydb.table.transaction.TxControl;
-import tech.ydb.table.values.PrimitiveValue;
-import tech.ydb.table.values.Type;
-import tech.ydb.table.values.Value;
 
 /**
  *
@@ -39,14 +32,10 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement impleme
 
     private static final long serialVersionUID = 1L;
 
-    private static final Logger log = LoggerFactory.getLogger(AbstractYdbTestElement.class);
-
-    private static final int MAX_RETAIN_SIZE = JMeterUtils.getPropDefault("ydbsampler.max_retain_result_size", 64 * 1024);
-
+    private static final Logger LOG = LoggerFactory.getLogger(AbstractYdbTestElement.class);
     private static final java.nio.charset.Charset CHARSET = StandardCharsets.UTF_8;
     private static final String COMMA = ",";
     private static final char COMMA_CHAR = ',';
-
 
     // Query types (used to communicate with GUI)
     // N.B. These must not be changed, as they are used in the JMX files
@@ -102,7 +91,7 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement impleme
      */
     protected byte[] execute(SessionRetryContext src, SampleResult sample)
             throws IOException, UnsupportedOperationException {
-        log.debug("executing ydb: {}", getQuery());
+        LOG.debug("executing ydb: {}", getQuery());
         // Based on query return value, get results
         final String qt = getQueryType();
         if (DATAQUERY.equals(qt)) {
@@ -124,7 +113,23 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement impleme
                         makeTxControl(), makeParams(), makeDataQuerySettings()))
                 .join().getValue();
         sample.latencyEnd();
-        return resultSetsToString(dqr).getBytes(CHARSET);
+        final StringBuilder sb = new StringBuilder();
+        final int nrs = dqr.getResultSetCount();
+        for (int irs = 0; irs < nrs; irs++) {
+            ResultSetReader rsr = dqr.getResultSet(irs);
+            sb.append("** Result set #").append(irs+1)
+                    .append(", ").append(rsr.getRowCount()).append(" rows");
+            if (rsr.isTruncated()) {
+                sb.append(" (TRUNCATED)");
+            }
+            sb.append("\n");
+            if (RS_STORE_AS_STRING.equalsIgnoreCase(getResultSetHandler())) {
+                appendColumns(sb, rsr);
+                appendRows(sb, rsr, 0);
+            }
+            storeVariables(rsr);
+        }
+        return sb.toString().getBytes(CHARSET);
     }
 
     private byte[] executeScanQuery(SessionRetryContext src, SampleResult sample) {
@@ -133,6 +138,7 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement impleme
             boolean latencyEnd;
             StringBuilder data;
             boolean needHeader;
+            boolean storeVariables;
             long totalRows;
         }
         final ScanQueryContext sqc = new ScanQueryContext();
@@ -141,11 +147,12 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement impleme
             sqc.data = new StringBuilder();
             sqc.needHeader = true;
         }
+        sqc.storeVariables = true;
         sqc.totalRows = 0;
         src.supplyStatus(session -> {
             GrpcReadStream<ResultSetReader> scan = session.executeScanQuery(getQuery(),
                     makeParams(), makeScanQuerySettings());
-            return scan.start(rs -> {
+            return scan.start(rsr -> {
                 if (sqc.latencyEnd) {
                     sample.latencyEnd();
                     sqc.latencyEnd = false;
@@ -154,10 +161,15 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement impleme
                     // Format and store the data rows
                     if (sqc.needHeader) {
                         sqc.needHeader = false;
-                        appendColumns(sqc.data, rs);
+                        appendColumns(sqc.data, rsr);
                     }
-                    sqc.totalRows = appendRows(sqc.data, rs, sqc.totalRows);
+                    appendRows(sqc.data, rsr, sqc.totalRows);
                 }
+                if (sqc.storeVariables) {
+                    sqc.storeVariables = false;
+                    storeVariables(rsr);
+                }
+                sqc.totalRows += rsr.getRowCount();
             });
         }).join().expectSuccess();
         if (sqc.latencyEnd) {
@@ -248,25 +260,6 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement impleme
         return params;
     }
 
-    private String resultSetsToString(DataQueryResult dqr) {
-        final StringBuilder sb = new StringBuilder();
-        final int nrs = dqr.getResultSetCount();
-        for (int irs = 0; irs < nrs; irs++) {
-            ResultSetReader rsr = dqr.getResultSet(irs);
-            sb.append("** Result set #").append(irs+1)
-                    .append(", ").append(rsr.getRowCount()).append(" rows");
-            if (rsr.isTruncated()) {
-                sb.append(" (TRUNCATED)");
-            }
-            sb.append("\n");
-            if (RS_STORE_AS_STRING.equalsIgnoreCase(getResultSetHandler())) {
-                appendColumns(sb, rsr);
-                appendRows(sb, rsr, 0);
-            }
-        }
-        return sb.toString();
-    }
-
     private void appendColumns(StringBuilder sb, ResultSetReader rsr) {
         final int nc = rsr.getColumnCount();
         for (int ic=0; ic<nc; ic++) {
@@ -278,6 +271,12 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement impleme
     }
 
     private long appendRows(StringBuilder sb, ResultSetReader rsr, long totalRows) {
+        final long maxRows = getIntegerResultSetMaxRows();
+        if (maxRows >= 0L && totalRows >= maxRows) {
+            totalRows += rsr.getRowCount();
+            return totalRows;
+        }
+        int nrow = 0;
         final int nc = rsr.getColumnCount();
         while (rsr.next()) {
             for (int ic=0; ic<nc; ic++) {
@@ -286,9 +285,17 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement impleme
                 rsr.getColumn(ic).toString(sb);
             }
             sb.append("\n");
-            totalRows += 1;
+            nrow += 1;
+            if (maxRows >= 0L && totalRows + nrow >= maxRows) {
+                break;
+            }
         }
+        totalRows += rsr.getRowCount();
         return totalRows;
+    }
+
+    private void storeVariables(ResultSetReader rsr) {
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
     }
 
     /**
