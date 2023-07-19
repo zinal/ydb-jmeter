@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.commons.lang3.StringUtils;
 
 /**
+ * As pre- and post-processors essentially do the same, so this class provides the implementation.
  *
  * @author zinal
  */

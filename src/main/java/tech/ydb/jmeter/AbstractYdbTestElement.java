@@ -28,6 +28,7 @@ import tech.ydb.table.transaction.TxControl;
 import tech.ydb.table.values.Type;
 
 /**
+ * A base class for all YDB test elements handling the basics of an SQL request.
  *
  * @author zinal
  */
