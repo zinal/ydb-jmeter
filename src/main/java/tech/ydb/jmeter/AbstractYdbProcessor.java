@@ -1,5 +1,8 @@
 package tech.ydb.jmeter;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.apache.commons.lang3.StringUtils;
 
 /**
@@ -9,16 +12,21 @@ import org.apache.commons.lang3.StringUtils;
 public abstract class AbstractYdbProcessor extends AbstractYdbTestElement {
 
     private static final long serialVersionUID = 1L;
+    private static final Logger LOG = LoggerFactory.getLogger(AbstractYdbTestElement.class);
 
     /**
-     * Calls the JDBC code to be executed.
+     * Calls the YDB code to be executed.
      */
     protected void process() {
         if (StringUtils.isBlank(getDataSource())) {
             throw new IllegalArgumentException("Name for DataSoure must not be empty in " + getName());
         }
-        YdbConnection conn = YdbConfigElement.getConnection(getDataSource());
-        execute(conn.getRetryCtx());
+        try {
+            YdbConnection conn = YdbConfigElement.getConnection(getDataSource());
+            execute(conn.getRetryCtx());
+        } catch(Exception ex) {
+            LOG.error("Processing failed on {}", getName(), ex);
+        }
     }
 
 }

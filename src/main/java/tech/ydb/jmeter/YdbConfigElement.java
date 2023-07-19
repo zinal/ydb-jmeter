@@ -1,11 +1,9 @@
 package tech.ydb.jmeter;
 
-import java.sql.SQLException;
-import java.util.Collections;
-import java.util.HashSet;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import org.apache.commons.lang3.StringUtils;
 
 import org.apache.jmeter.config.ConfigElement;
 import org.apache.jmeter.gui.TestElementMetadata;
@@ -17,6 +15,7 @@ import org.apache.jmeter.threads.JMeterContextService;
 import org.apache.jmeter.threads.JMeterVariables;
 
 /**
+ * YDB connection configuration element.
  *
  * @author zinal
  */
@@ -24,9 +23,8 @@ import org.apache.jmeter.threads.JMeterVariables;
 public class YdbConfigElement extends AbstractTestElement
         implements ConfigElement, TestStateListener, TestBean {
 
-    private static final Logger LOG = LoggerFactory.getLogger(YdbConfigElement.class);
-
     private static final long serialVersionUID = 1L;
+    private static final Logger LOG = LoggerFactory.getLogger(YdbConfigElement.class);
 
     private transient String dataSource;
     private transient String endpoint;

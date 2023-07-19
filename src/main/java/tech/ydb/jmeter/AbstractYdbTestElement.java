@@ -31,13 +31,14 @@ import tech.ydb.table.values.Type;
  *
  * @author zinal
  */
-public abstract class AbstractYdbTestElement extends AbstractTestElement implements TestStateListener {
+public abstract class AbstractYdbTestElement extends AbstractTestElement
+        implements TestStateListener {
 
     private static final long serialVersionUID = 1L;
+    private static final Logger LOG = LoggerFactory.getLogger(AbstractYdbTestElement.class);
 
     protected static final java.nio.charset.Charset CHARSET = StandardCharsets.UTF_8;
 
-    private static final Logger LOG = LoggerFactory.getLogger(AbstractYdbTestElement.class);
     private static final String COMMA = ",";
     private static final char COMMA_CHAR = ',';
 
@@ -76,7 +77,7 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement impleme
      * @return the result of the execute command
      */
     protected byte[] execute(SessionRetryContext src) {
-        return execute(src,  new SampleResult());
+        return execute(src, new SampleResult());
     }
 
     /**
