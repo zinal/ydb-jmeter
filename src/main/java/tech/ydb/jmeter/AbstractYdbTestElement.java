@@ -26,6 +26,7 @@ import tech.ydb.table.settings.ExecuteScanQuerySettings;
 import tech.ydb.table.settings.ExecuteSchemeQuerySettings;
 import tech.ydb.table.transaction.TxControl;
 import tech.ydb.table.values.Type;
+import tech.ydb.table.values.Value;
 
 /**
  * A base class for all YDB test elements handling the basics of an SQL request.
@@ -42,6 +43,9 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
 
     private static final String COMMA = ",";
     private static final char COMMA_CHAR = ',';
+
+    // Maximum allowed capacity to store query results.
+    public static final int MAX_STORE_CHARS = 65536;
 
     // Query types (used to communicate with GUI)
     // N.B. These must not be changed, as they are used in the JMX files
@@ -103,7 +107,7 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
             return executeSchemeQuery(src, sample);
         }
         // User provided incorrect query type
-        throw new UnsupportedOperationException("Unexpected query type: " + qt);
+        throw new UnsupportedOperationException("Unexpected YDB query type: " + qt);
     }
 
     private byte[] executeDataQuery(SessionRetryContext src, SampleResult sample) {
@@ -270,25 +274,42 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
         sb.append("\n");
     }
 
-    private long appendRows(StringBuilder sb, ResultSetReader rsr, long totalRows) {
-        final long maxRows = getIntegerResultSetMaxRows();
-        if (maxRows >= 0L && totalRows >= maxRows) {
-            totalRows += rsr.getRowCount();
-            return totalRows;
-        }
-        int nrow = 0;
-        final int nc = rsr.getColumnCount();
-        while (rsr.next()) {
-            for (int ic=0; ic<nc; ic++) {
-                if (ic>0)
-                    sb.append("\t");
-                rsr.getColumn(ic).toString(sb);
+    private static void val2buf(ValueReader vr, StringBuilder sb) {
+        Value<?> v = vr.getValue();
+        if (v!=null) {
+            if (Type.Kind.OPTIONAL.equals(v.getType().getKind())) {
+                if (! v.asOptional().isPresent()) {
+                    v = null;
+                } else {
+                    v = v.asOptional().get();
+                }
             }
-            sb.append("\n");
-            nrow += 1;
+        }
+        if (v==null) {
+            sb.append("?");
+            return;
+        }
+        sb.append(v.toString());
+    }
+
+    private long appendRows(StringBuilder sb, ResultSetReader rsr, long totalRows) {
+        final int nc = rsr.getColumnCount();
+        final long maxRows = getIntegerResultSetMaxRows();
+        int nrow = 0;
+        while (rsr.next()) {
+            if (sb.length() >= MAX_STORE_CHARS) {
+                break;
+            }
             if (maxRows >= 0L && (totalRows + nrow) >= maxRows) {
                 break;
             }
+            for (int ic=0; ic<nc; ic++) {
+                if (ic>0)
+                    sb.append("\t");
+                val2buf(rsr.getColumn(ic), sb);
+            }
+            sb.append("\n");
+            nrow += 1;
         }
         totalRows += rsr.getRowCount();
         return totalRows;
