@@ -15,7 +15,7 @@ public abstract class AbstractYdbBeanInfoSupport extends BeanInfoSupport {
         super(beanClass);
 
         createPropertyGroup("varName",
-                new String[]{"dataSource" });
+                new String[]{"dataSource", "txType" });
 
         createPropertyGroup("sql",
                 new String[] {
@@ -33,6 +33,32 @@ public abstract class AbstractYdbBeanInfoSupport extends BeanInfoSupport {
         p.setValue(NOT_UNDEFINED, Boolean.TRUE);
         p.setValue(DEFAULT, "");
 
+        p = property("txType");
+        p.setValue(NOT_UNDEFINED, Boolean.TRUE);
+        p.setValue(DEFAULT, AbstractYdbTestElement.SERIALIZABLERW);
+        p.setValue(NOT_OTHER, Boolean.TRUE);
+        p.setValue(TAGS,new String[]{
+                AbstractYdbTestElement.SERIALIZABLERW,
+                AbstractYdbTestElement.ONLINERO,
+                AbstractYdbTestElement.STALERO,
+                AbstractYdbTestElement.SNAPSHOTRO,
+                });
+
+        p = property("queryType");
+        p.setValue(NOT_UNDEFINED, Boolean.TRUE);
+        p.setValue(DEFAULT, AbstractYdbTestElement.DATAQUERY);
+        p.setValue(NOT_OTHER,Boolean.TRUE);
+        p.setValue(TAGS,new String[]{
+                AbstractYdbTestElement.DATAQUERY,
+                AbstractYdbTestElement.SCANQUERY,
+                AbstractYdbTestElement.SCHEMEQUERY,
+                });
+
+        p = property("query", TypeEditor.TextAreaEditor);
+        p.setValue(NOT_UNDEFINED, Boolean.TRUE);
+        p.setValue(DEFAULT, "");
+        p.setValue(TEXT_LANGUAGE, "sql");
+
         p = property("queryArguments");
         p.setValue(NOT_UNDEFINED, Boolean.TRUE);
         p.setValue(DEFAULT, "");
@@ -45,19 +71,6 @@ public abstract class AbstractYdbBeanInfoSupport extends BeanInfoSupport {
         p.setValue(NOT_UNDEFINED, Boolean.TRUE);
         p.setValue(DEFAULT, "");
 
-        p = property("resultSetHandler");
-        p.setValue(NOT_UNDEFINED, Boolean.TRUE);
-        p.setValue(DEFAULT, AbstractYdbTestElement.RS_STORE_AS_STRING);
-        p.setValue(NOT_OTHER, Boolean.TRUE);
-        p.setValue(TAGS,new String[]{
-                AbstractYdbTestElement.RS_STORE_AS_STRING,
-                AbstractYdbTestElement.RS_COUNT_RECORDS
-                });
-
-        p = property("resultVariable");
-        p.setValue(NOT_UNDEFINED, Boolean.TRUE);
-        p.setValue(DEFAULT, "");
-
         p = property("queryTimeout");
         p.setValue(NOT_UNDEFINED, Boolean.TRUE);
         p.setValue(DEFAULT, "");
@@ -66,30 +79,13 @@ public abstract class AbstractYdbBeanInfoSupport extends BeanInfoSupport {
         p.setValue(NOT_UNDEFINED, Boolean.TRUE);
         p.setValue(DEFAULT, "");
 
-        p = property("queryType");
+        p = property("resultSetHandler");
         p.setValue(NOT_UNDEFINED, Boolean.TRUE);
-        p.setValue(DEFAULT, AbstractYdbTestElement.DATAQUERY);
-        p.setValue(NOT_OTHER,Boolean.TRUE);
+        p.setValue(DEFAULT, AbstractYdbTestElement.RS_STORE_AS_STRING);
+        p.setValue(NOT_OTHER, Boolean.TRUE);
         p.setValue(TAGS,new String[]{
-                AbstractYdbTestElement.DATAQUERY,
-                AbstractYdbTestElement.SCANQUERY,
-                AbstractYdbTestElement.SCHEMEQUERY,
+                AbstractYdbTestElement.RS_STORE_AS_STRING,
+                AbstractYdbTestElement.RS_COUNT_RECORDS
                 });
-
-        p = property("txType");
-        p.setValue(NOT_UNDEFINED, Boolean.TRUE);
-        p.setValue(DEFAULT, AbstractYdbTestElement.SERIALIZABLERW);
-        p.setValue(NOT_OTHER,Boolean.TRUE);
-        p.setValue(TAGS,new String[]{
-                AbstractYdbTestElement.SERIALIZABLERW,
-                AbstractYdbTestElement.ONLINERO,
-                AbstractYdbTestElement.STALERO,
-                AbstractYdbTestElement.SNAPSHOTRO,
-                });
-
-        p = property("query", TypeEditor.TextAreaEditor);
-        p.setValue(NOT_UNDEFINED, Boolean.TRUE);
-        p.setValue(DEFAULT, "");
-        p.setValue(TEXT_LANGUAGE, "sql"); 
     }
 }
