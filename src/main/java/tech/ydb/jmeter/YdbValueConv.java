@@ -23,9 +23,9 @@ public class YdbValueConv {
             optional = true;
             type = type.substring(0, type.length()-1);
         }
-        Conv conv = HANDLERS.get(type);
+        Conv conv = HANDLERS.get(type.toLowerCase());
         if (conv==null) {
-            throw new IllegalArgumentException("Unsupported data type: " + type);
+            throw new IllegalArgumentException("Unsupported YDB data type: " + type);
         }
         return conv.convert(value, optional);
     }
