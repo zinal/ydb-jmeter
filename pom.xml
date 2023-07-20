@@ -48,11 +48,13 @@
             <groupId>org.apache.jmeter</groupId>
             <artifactId>ApacheJMeter_core</artifactId>
             <version>5.6.2</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
             <version>3.12.0</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
@@ -61,4 +63,95 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+    <profiles>
+        <profile>
+            <id>release-profile</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-shade-plugin</artifactId>
+                        <version>3.5.0</version>
+                        <executions>
+                            <execution>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>shade</goal>
+                                </goals>
+                                <configuration>
+                                    <minimizeJar>true</minimizeJar>
+                                    <filters>
+                                        <filter>
+                                            <artifact>io.jsonwebtoken:jjwt-impl</artifact>
+                                            <includes>
+                                                <include>**</include>
+                                            </includes>
+                                        </filter>
+                                        <filter>
+                                            <artifact>io.jsonwebtoken:jjwt-jackson</artifact>
+                                            <includes>
+                                                <include>**</include>
+                                            </includes>
+                                        </filter>
+                                        <filter>
+                                            <artifact>com.fasterxml.jackson.core:jackson-databind</artifact>
+                                            <includes>
+                                                <include>**</include>
+                                            </includes>
+                                        </filter>
+                                        <filter>
+                                            <artifact>org.bouncycastle:bcprov-jdk18on</artifact>
+                                            <includes>
+                                                <include>**</include>
+                                            </includes>
+                                        </filter>
+                                        <filter>
+                                            <artifact>*:*</artifact>
+                                            <excludes>
+                                                <exclude>META-INF/NOTICE</exclude>
+                                                <exclude>META-INF/license/*.txt</exclude>
+                                                <exclude>META-INF/**.txt</exclude>
+                                                <exclude>META-INF/**.SF</exclude>
+                                                <exclude>META-INF/**.DSA</exclude>
+                                                <exclude>META-INF/**.RSA</exclude>
+                                                <exclude>**/module-info.class</exclude>
+                                            </excludes>
+                                        </filter>
+                                    </filters>
+                                    <relocations>
+                                        <relocation>
+                                            <pattern>com.google</pattern>
+                                            <shadedPattern>yandex.shaded.google</shadedPattern>
+                                        </relocation>
+                                        <relocation>
+                                            <pattern>io.grpc</pattern>
+                                            <shadedPattern>yandex.shaded.grpc</shadedPattern>
+                                        </relocation>
+                                    </relocations>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-jar-plugin</artifactId>
+                        <version>3.3.0</version>
+                        <configuration>
+                            <archive>
+                                <compress>true</compress>
+                                <manifest>
+                                    <addClasspath>true</addClasspath>
+                                    <!-- <classpathPrefix>lib/</classpathPrefix> -->
+                                    <mainClass>yandex.cloud.zeppelin.ydbrepo.Tool</mainClass>
+                                </manifest>
+                            </archive>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
