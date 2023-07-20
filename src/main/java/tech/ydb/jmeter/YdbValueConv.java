@@ -80,13 +80,15 @@ public class YdbValueConv {
                 value = value.trim();
             }
             if (value==null || value.length()==0) {
-                if (optional)
+                if (optional) {
                     return otype.emptyValue();
+                }
                 throw makeIllegalEmpty();
             }
             Value<?> v = convertNum(value);
-            if (optional)
+            if (optional) {
                 v = v.makeOptional();
+            }
             return v;
         }
         protected abstract Value<?> convertNum(String value);
@@ -202,12 +204,18 @@ public class YdbValueConv {
         }
     }
 
-    private static class ConvText implements Conv {
-        private final OptionalType otype = PrimitiveType.Text.makeOptional();
+    private static abstract class ConvTextBase implements Conv {
+        private final String name;
+        private final OptionalType otype;
+
+        public ConvTextBase(String name, Type type) {
+            this.name = name;
+            this.otype = type.makeOptional();
+        }
 
         @Override
         public String name() {
-            return "Text";
+            return name;
         }
 
         @Override
@@ -218,46 +226,50 @@ public class YdbValueConv {
                 }
                 throw makeIllegalEmpty();
             }
+            if (value.length()==0) {
+                if (optional) {
+                    return otype.emptyValue();
+                }
+            }
+            Value<?> v = textConv(value);
+            if (optional) {
+                v = v.makeOptional();
+            }
+            return v;
+        }
+
+        protected abstract Value<?> textConv(String value);
+    }
+
+    private static class ConvText extends ConvTextBase {
+        public ConvText() {
+            super("Text", PrimitiveType.Text);
+        }
+
+        @Override
+        protected Value<?> textConv(String value) {
             return PrimitiveValue.newText(value);
         }
     }
 
-    private static class ConvBytes implements Conv {
-        private final OptionalType otype = PrimitiveType.Bytes.makeOptional();
-
-        @Override
-        public String name() {
-            return "Bytes";
+    private static class ConvBytes extends ConvTextBase {
+        public ConvBytes() {
+            super("Bytes", PrimitiveType.Bytes);
         }
 
         @Override
-        public Value<?> convert(String value, boolean optional) {
-            if (value==null) {
-                if (optional) {
-                    return otype.emptyValue();
-                }
-                throw makeIllegalEmpty();
-            }
+        protected Value<?> textConv(String value) {
             return PrimitiveValue.newBytes(value.getBytes(StandardCharsets.UTF_8));
         }
     }
 
-    private static class ConvBase64 implements Conv {
-        private final OptionalType otype = PrimitiveType.Bytes.makeOptional();
-
-        @Override
-        public String name() {
-            return "Base64";
+    private static class ConvBase64 extends ConvTextBase {
+        public ConvBase64() {
+            super("Base64", PrimitiveType.Bytes);
         }
 
         @Override
-        public Value<?> convert(String value, boolean optional) {
-            if (value==null) {
-                if (optional) {
-                    return otype.emptyValue();
-                }
-                throw makeIllegalEmpty();
-            }
+        protected Value<?> textConv(String value) {
             return PrimitiveValue.newBytes(java.util.Base64.getUrlDecoder().decode(value));
         }
     }

@@ -122,7 +122,7 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
         for (int irs = 0; irs < nrs; irs++) {
             ResultSetReader rsr = dqr.getResultSet(irs);
             sb.append("** Result set #").append(irs+1)
-                    .append(", ").append(rsr.getRowCount()).append(" rows");
+                    .append(", ").append(rsr.getRowCount()).append(" row(s)");
             if (rsr.isTruncated()) {
                 sb.append(" (TRUNCATED)");
             }
