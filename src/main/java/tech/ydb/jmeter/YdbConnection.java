@@ -61,7 +61,7 @@ public class YdbConnection implements AutoCloseable {
             }
             builder.withSecureConnection(cert);
         }
-        final GrpcTransport gt = builder.build();
+        GrpcTransport gt = builder.build();
         try {
             this.tableClient = TableClient.newClient(gt)
                     .sessionPoolSize(1, config.getPoolMaxInt())
@@ -71,6 +71,7 @@ public class YdbConnection implements AutoCloseable {
             this.authMode = config.getAuthModeCode();
             this.database = gt.getDatabase();
             this.transport = gt;
+            gt = null;
         } finally {
             if (gt != null)
                 gt.close();
