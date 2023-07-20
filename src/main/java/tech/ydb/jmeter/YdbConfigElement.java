@@ -35,8 +35,6 @@ public class YdbConfigElement extends AbstractTestElement
     private transient String saKeyFile;
     private transient String tlsCertFile;
     private transient String poolMax;
-    private transient String connectionAge;
-    private transient String timeout;
 
     public static String getConnectionInfo(String poolName) {
         Object poolObject =
@@ -205,22 +203,6 @@ public class YdbConfigElement extends AbstractTestElement
 
     public void setPoolMax(String poolMax) {
         this.poolMax = poolMax;
-    }
-
-    public String getConnectionAge() {
-        return connectionAge;
-    }
-
-    public void setConnectionAge(String connectionAge) {
-        this.connectionAge = connectionAge;
-    }
-
-    public String getTimeout() {
-        return timeout;
-    }
-
-    public void setTimeout(String timeout) {
-        this.timeout = timeout;
     }
 
     public enum AuthMode {

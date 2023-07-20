@@ -66,7 +66,7 @@ public class YdbConnection implements AutoCloseable {
             this.tableClient = TableClient.newClient(gt)
                     .sessionPoolSize(1, config.getPoolMaxInt())
                     .build();
-            this.retryCtx = SessionRetryContext.create(tableClient).build();
+            this.retryCtx = SessionRetryContext.create(tableClient).idempotent(true).build();
             this.endpoint = config.getEndpoint();
             this.authMode = config.getAuthModeCode();
             this.database = gt.getDatabase();
