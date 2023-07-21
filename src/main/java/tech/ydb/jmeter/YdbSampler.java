@@ -39,7 +39,7 @@ public class YdbSampler extends AbstractYdbTestElement
         res.setSampleLabel(getName());
         res.setSamplerData(toString());
         res.setDataType(SampleResult.TEXT);
-        res.setContentType("text/plain"); // $NON-NLS-1$
+        res.setContentType("text/plain");
         res.setDataEncoding(CHARSET.name());
 
         // Assume we will be successful

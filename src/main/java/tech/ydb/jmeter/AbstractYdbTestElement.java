@@ -545,9 +545,9 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder(80);
-        sb.append("["); // $NON-NLS-1$
+        sb.append("[");
         sb.append(getQueryType());
-        sb.append("] "); // $NON-NLS-1$
+        sb.append("] ");
         sb.append(getQuery());
         sb.append("\n");
         sb.append(getQueryArguments());
