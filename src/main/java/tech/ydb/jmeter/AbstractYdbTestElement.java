@@ -223,9 +223,10 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
     private ExecuteScanQuerySettings makeScanQuerySettings() {
         ExecuteScanQuerySettings.Builder builder = ExecuteScanQuerySettings.newBuilder();
         int timeout = getIntegerQueryTimeout();
-        if (timeout > 0) {
-            builder.withRequestTimeout(Duration.ofSeconds(timeout));
+        if (timeout <= 0) {
+            timeout = 3600;
         }
+        builder.withRequestTimeout(Duration.ofSeconds(timeout));
         return builder.build();
     }
 
