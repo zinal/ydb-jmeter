@@ -37,12 +37,10 @@
         <dependency>
             <groupId>tech.ydb</groupId>
             <artifactId>ydb-sdk-table</artifactId>
-            <version>2.1.2</version>
         </dependency>
         <dependency>
             <groupId>tech.ydb.auth</groupId>
             <artifactId>yc-auth-provider</artifactId>
-            <version>2.1.0</version>
         </dependency>
         <dependency>
             <groupId>org.apache.jmeter</groupId>
