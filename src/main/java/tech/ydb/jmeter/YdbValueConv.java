@@ -5,6 +5,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.math.BigDecimal;
+import tech.ydb.table.values.DecimalType;
 import tech.ydb.table.values.OptionalType;
 import tech.ydb.table.values.PrimitiveType;
 import tech.ydb.table.values.PrimitiveValue;
@@ -49,6 +51,7 @@ public class YdbValueConv {
         reg(new ConvText());
         reg(new ConvBytes());
         reg(new ConvBase64());
+        reg(new ConvDecimal());
     }
 
     private static void reg(Conv conv) {
@@ -171,6 +174,16 @@ public class YdbValueConv {
         @Override
         public Value<?> convertNum(String value) {
             return PrimitiveValue.newDouble(Double.parseDouble(value));
+        }
+    }
+
+    private static class ConvDecimal extends ConvNum {
+        public ConvDecimal() {
+            super("Decimal", DecimalType.getDefault());
+        }
+        @Override
+        public Value<?> convertNum(String value) {
+            return DecimalType.getDefault().newValue(new BigDecimal(value));
         }
     }
 
