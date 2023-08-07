@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.math.BigDecimal;
 import tech.ydb.table.values.DecimalType;
+import tech.ydb.table.values.DecimalValue;
 import tech.ydb.table.values.OptionalType;
 import tech.ydb.table.values.PrimitiveType;
 import tech.ydb.table.values.PrimitiveValue;
@@ -30,6 +31,62 @@ public class YdbValueConv {
             throw new UnsupportedOperationException("Unsupported YDB data type: " + type);
         }
         return conv.convert(value, optional);
+    }
+
+    public static String convert(Value<?> value) {
+        if (value==null) {
+            return null;
+        }
+        switch (value.getType().getKind()) {
+            case OPTIONAL:
+                if (! value.asOptional().isPresent())
+                    return null;
+                value = value.asOptional().get();
+        }
+        switch (value.getType().getKind()) {
+            case PRIMITIVE:
+                PrimitiveValue pv = value.asData();
+                switch (pv.getType()) {
+                    case Text:
+                        return pv.getText();
+                    case Json:
+                        return pv.getJson();
+                    case JsonDocument:
+                        return pv.getJsonDocument();
+                    case Bool:
+                        return String.valueOf(pv.getBool());
+                    case Int8:
+                        return String.valueOf(pv.getInt8());
+                    case Int16:
+                        return String.valueOf(pv.getInt16());
+                    case Int32:
+                        return String.valueOf(pv.getInt32());
+                    case Int64:
+                        return String.valueOf(pv.getInt64());
+                    case Uint8:
+                        return String.valueOf(pv.getUint8());
+                    case Uint16:
+                        return String.valueOf(pv.getUint16());
+                    case Uint32:
+                        return String.valueOf(pv.getUint32());
+                    case Uint64:
+                        return String.valueOf(pv.getUint64());
+                    case Float:
+                        return String.valueOf(pv.getFloat());
+                    case Double:
+                        return String.valueOf(pv.getDouble());
+                    case Date:
+                        return pv.getDate().toString();
+                    case Datetime:
+                        return pv.getDatetime().toString();
+                    case Timestamp:
+                        return pv.getTimestamp().toString();
+                }
+                break;
+            case DECIMAL:
+                return ((DecimalValue) value).toBigDecimal().toPlainString();
+        }
+        return value.toString();
     }
 
     private static RuntimeException makeIllegalEmpty() {

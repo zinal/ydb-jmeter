@@ -316,16 +316,6 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
         return totalRows;
     }
 
-    private boolean isValuePresent(ValueReader vr) {
-        if (vr==null) {
-            return false;
-        }
-        if (Type.Kind.OPTIONAL.equals(vr.getType().getKind())) {
-            return vr.getValue().asOptional().isPresent();
-        }
-        return true;
-    }
-
     private int storeVariables(ResultSetReader rsr, int varPos) {
         if (rsr.getRowCount()==0)
             return 0;
@@ -339,14 +329,8 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
             String name = varnames[pos].trim();
             if (name.length()==0)
                 continue;
-            ValueReader vr = rsr.getColumn(pos);
-            if (isValuePresent(vr)) {
-                final StringBuilder sb = new StringBuilder();
-                vr.toString(sb);
-                jmvars.putObject(name, sb.toString());
-            } else {
-                jmvars.putObject(name, null);
-            }
+            String value = YdbValueConv.convert(rsr.getColumn(pos).getValue());
+            jmvars.putObject(name, value);
         }
         return pos;
     }
