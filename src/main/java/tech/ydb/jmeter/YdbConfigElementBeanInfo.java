@@ -1,6 +1,5 @@
 package tech.ydb.jmeter;
 
-import java.util.Set;
 import java.beans.PropertyDescriptor;
 
 import org.apache.jmeter.testbeans.BeanInfoSupport;
