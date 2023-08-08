@@ -35,6 +35,7 @@ public class YdbConfigElement extends AbstractTestElement
     private transient String saKeyFile;
     private transient String tlsCertFile;
     private transient String poolMax;
+    private transient String retriesMax;
 
     public static String getConnectionInfo(String poolName) {
         Object poolObject =
@@ -203,6 +204,25 @@ public class YdbConfigElement extends AbstractTestElement
 
     public void setPoolMax(String poolMax) {
         this.poolMax = poolMax;
+    }
+
+    public int getRetriesMaxInt() {
+        String v = getRetriesMax();
+        int vx = -1;
+        if (v!=null && v.trim().length() > 0)
+            vx = Integer.parseInt(v);
+        if (vx > 10) {
+            return vx;
+        }
+        return 10;
+    }
+
+    public String getRetriesMax() {
+        return retriesMax;
+    }
+
+    public void setRetriesMax(String retriesMax) {
+        this.retriesMax = retriesMax;
     }
 
     public enum AuthMode {

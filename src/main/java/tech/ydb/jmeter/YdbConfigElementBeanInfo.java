@@ -12,7 +12,8 @@ public class YdbConfigElementBeanInfo extends BeanInfoSupport {
 
         createPropertyGroup("varName", new String[] { "dataSource" });
 
-        createPropertyGroup("database", new String[] { "endpoint", "database", "tlsCertFile", "poolMax" });
+        createPropertyGroup("database", new String[] { "endpoint", "database", 
+            "tlsCertFile", "poolMax", "retriesMax" });
 
         createPropertyGroup("auth", new String[] { "authMode", "username", "password", "saKeyFile" });
 
@@ -32,6 +33,10 @@ public class YdbConfigElementBeanInfo extends BeanInfoSupport {
         p.setValue(DEFAULT, "");
 
         p = property("poolMax");
+        p.setValue(NOT_UNDEFINED, Boolean.TRUE);
+        p.setValue(DEFAULT, "-1");
+
+        p = property("retriesMax");
         p.setValue(NOT_UNDEFINED, Boolean.TRUE);
         p.setValue(DEFAULT, "-1");
 

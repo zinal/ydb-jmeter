@@ -213,10 +213,11 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
     private ExecuteDataQuerySettings makeDataQuerySettings() {
         ExecuteDataQuerySettings ret = new ExecuteDataQuerySettings();
         int timeout = getIntegerQueryTimeout();
-        if (timeout > 0) {
-            ret.setCancelAfter(Duration.ofSeconds(timeout));
-            ret.setTimeout(Duration.ofSeconds(timeout+1));
+        if (timeout <= 0) {
+            timeout = 3600;
         }
+        ret.setCancelAfter(Duration.ofSeconds(timeout));
+        ret.setTimeout(Duration.ofSeconds(timeout+1));
         return ret;
     }
 
