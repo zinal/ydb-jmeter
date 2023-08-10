@@ -81,7 +81,7 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
      * @param src a {@link SessionRetryContext}
      * @return the result of the execute command
      */
-    protected byte[] execute(SessionRetryContext src) {
+    protected YdbQueryResult execute(SessionRetryContext src) {
         return execute(src, new SampleResult());
     }
 
@@ -93,7 +93,7 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
      * @param sample a {@link SampleResult} to save the latency
      * @return the result of the execute command
      */
-    protected byte[] execute(SessionRetryContext src, SampleResult sample) {
+    protected YdbQueryResult execute(SessionRetryContext src, SampleResult sample) {
         LOG.debug("executing ydb: {}", getQuery());
         // Based on query return value, get results
         final String qt = getQueryType();
@@ -110,8 +110,9 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
         throw new UnsupportedOperationException("Unexpected YDB query type: " + qt);
     }
 
-    private byte[] executeDataQuery(SessionRetryContext src, SampleResult sample) {
-        DataQueryResult dqr = src.supplyResult(new YdbRetryHandler(getName()),
+    private YdbQueryResult executeDataQuery(SessionRetryContext src, SampleResult sample) {
+        final YdbRetryHandler handler = new YdbRetryHandler(getName());
+        DataQueryResult dqr = src.supplyResult(handler,
                 session -> session.executeDataQuery(getQuery(),
                         makeTxControl(), makeParams(), makeDataQuerySettings()))
                 .join().getValue();
@@ -133,10 +134,10 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
             }
             varPos = storeVariables(rsr, varPos);
         }
-        return sb.toString().getBytes(CHARSET);
+        return new YdbQueryResult(sb.toString().getBytes(CHARSET), handler.getRetryCount());
     }
 
-    private byte[] executeScanQuery(SessionRetryContext src, SampleResult sample) {
+    private YdbQueryResult executeScanQuery(SessionRetryContext src, SampleResult sample) {
         // Input-output data for async operations
         class ScanQueryContext {
             boolean latencyEnd;
@@ -153,8 +154,8 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
         }
         sqc.storeVariables = true;
         sqc.totalRows = 0;
-        src.supplyStatus(new YdbRetryHandler(getName()),
-                session -> {
+        final YdbRetryHandler handler = new YdbRetryHandler(getName());
+        src.supplyStatus(handler, session -> {
             GrpcReadStream<ResultSetReader> scan = session.executeScanQuery(getQuery(),
                     makeParams(), makeScanQuerySettings());
             return scan.start(rsr -> {
@@ -181,18 +182,21 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
             // Empty result set, need to report latency
             sample.latencyEnd();
         }
+        final byte[] data;
         if (sqc.data!=null) {
             sqc.data.append("** Total rows: ").append(sqc.totalRows);
-            return sqc.data.toString().getBytes(CHARSET);
+            data = sqc.data.toString().getBytes(CHARSET);
+        } else {
+            data = ("** Total rows: " + Long.toString(sqc.totalRows)).getBytes(CHARSET);
         }
-        return ("** Total rows: " + Long.toString(sqc.totalRows)).getBytes(CHARSET);
+        return new YdbQueryResult(data, handler.getRetryCount());
     }
 
-    private byte[] executeSchemeQuery(SessionRetryContext src, SampleResult sample) {
+    private YdbQueryResult executeSchemeQuery(SessionRetryContext src, SampleResult sample) {
         src.supplyStatus(session -> session.executeSchemeQuery(getQuery(), 
                 makeSchemeQuerySettings())).join().expectSuccess();
         sample.latencyEnd();
-        return new byte[0];
+        return new YdbQueryResult(new byte[0], 0);
     }
 
     private TxControl<?> makeTxControl() {
