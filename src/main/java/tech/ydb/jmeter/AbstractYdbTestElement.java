@@ -111,7 +111,7 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
     }
 
     private byte[] executeDataQuery(SessionRetryContext src, SampleResult sample) {
-        DataQueryResult dqr = src.supplyResult(
+        DataQueryResult dqr = src.supplyResult(new YdbRetryHandler(getName()),
                 session -> session.executeDataQuery(getQuery(),
                         makeTxControl(), makeParams(), makeDataQuerySettings()))
                 .join().getValue();
@@ -153,7 +153,8 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
         }
         sqc.storeVariables = true;
         sqc.totalRows = 0;
-        src.supplyStatus(session -> {
+        src.supplyStatus(new YdbRetryHandler(getName()),
+                session -> {
             GrpcReadStream<ResultSetReader> scan = session.executeScanQuery(getQuery(),
                     makeParams(), makeScanQuerySettings());
             return scan.start(rsr -> {
