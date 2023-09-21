@@ -17,4 +17,6 @@ For DataQuery and ScanQuery the input parameters can be specified. The parameter
 
 The first row of output from DataQuery or ScanQuery can be used to fill in the output JMeter variables.
 
-To install the plugin, its jar should be copied to the `lib/ext` subdirectory of the JMeter installation.
+## Installation
+
+To install the plugin, [its jar from the Releases page](https://github.com/ydb-platform/ydb-jmeter/releases) should be copied to the `lib/ext` subdirectory of the JMeter installation.
