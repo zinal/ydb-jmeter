@@ -231,6 +231,9 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
     }
 
     private TxControl<?> makeTxControl() {
+        if (IMPLICIT.equalsIgnoreCase(txType)) {
+            return TxControl.serializableRw();
+        }
         if (SERIALIZABLERW.equalsIgnoreCase(txType)) {
             return TxControl.serializableRw();
         }

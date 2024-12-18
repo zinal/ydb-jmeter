@@ -35,7 +35,7 @@ public abstract class AbstractYdbBeanInfoSupport extends BeanInfoSupport {
 
         p = property("txType");
         p.setValue(NOT_UNDEFINED, Boolean.TRUE);
-        p.setValue(DEFAULT, AbstractYdbTestElement.SERIALIZABLERW);
+        p.setValue(DEFAULT, AbstractYdbTestElement.IMPLICIT);
         p.setValue(NOT_OTHER, Boolean.TRUE);
         p.setValue(TAGS,new String[]{
                 AbstractYdbTestElement.IMPLICIT,
@@ -48,7 +48,7 @@ public abstract class AbstractYdbBeanInfoSupport extends BeanInfoSupport {
 
         p = property("queryType");
         p.setValue(NOT_UNDEFINED, Boolean.TRUE);
-        p.setValue(DEFAULT, AbstractYdbTestElement.DATAQUERY);
+        p.setValue(DEFAULT, AbstractYdbTestElement.QUERYSERVICE);
         p.setValue(NOT_OTHER,Boolean.TRUE);
         p.setValue(TAGS,new String[]{
                 AbstractYdbTestElement.QUERYSERVICE,
