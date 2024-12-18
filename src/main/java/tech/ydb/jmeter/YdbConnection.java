@@ -10,7 +10,7 @@ import tech.ydb.auth.iam.CloudAuthHelper;
 import tech.ydb.core.auth.StaticCredentials;
 import tech.ydb.core.grpc.GrpcTransport;
 import tech.ydb.core.grpc.GrpcTransportBuilder;
-import tech.ydb.table.SessionRetryContext;
+import tech.ydb.query.QueryClient;
 import tech.ydb.table.TableClient;
 
 /**
@@ -22,8 +22,10 @@ public class YdbConnection implements AutoCloseable {
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(YdbConnection.class);
 
     private final GrpcTransport transport;
+    private final QueryClient queryClient;
+    private final tech.ydb.query.tools.SessionRetryContext queryRetryCtx;
     private final TableClient tableClient;
-    private final SessionRetryContext retryCtx;
+    private final tech.ydb.table.SessionRetryContext tableRetryCtx;
     private final String endpoint;
     private final String database;
     private final YdbConfigElement.AuthMode authMode;
@@ -63,10 +65,19 @@ public class YdbConnection implements AutoCloseable {
         }
         GrpcTransport gt = builder.build();
         try {
-            this.tableClient = TableClient.newClient(gt)
-                    .sessionPoolSize(1, config.getPoolMaxInt())
+            this.queryClient = QueryClient.newClient(gt)
+                    .sessionPoolMinSize(0)
+                    .sessionPoolMaxSize(config.getPoolMaxInt())
                     .build();
-            this.retryCtx = SessionRetryContext
+            this.queryRetryCtx = tech.ydb.query.tools.SessionRetryContext
+                    .create(queryClient)
+                    .maxRetries(config.getRetriesMaxInt())
+                    .idempotent(true)
+                    .build();
+            this.tableClient = TableClient.newClient(gt)
+                    .sessionPoolSize(0, config.getPoolMaxInt())
+                    .build();
+            this.tableRetryCtx = tech.ydb.table.SessionRetryContext
                     .create(tableClient)
                     .maxRetries(config.getRetriesMaxInt())
                     .idempotent(true)
@@ -82,12 +93,20 @@ public class YdbConnection implements AutoCloseable {
         }
     }
 
+    public QueryClient getQueryClient() {
+        return queryClient;
+    }
+
     public TableClient getTableClient() {
         return tableClient;
     }
 
-    public SessionRetryContext getRetryCtx() {
-        return retryCtx;
+    public tech.ydb.query.tools.SessionRetryContext getQueryRetryCtx() {
+        return queryRetryCtx;
+    }
+
+    public tech.ydb.table.SessionRetryContext getTableRetryCtx() {
+        return tableRetryCtx;
     }
 
     public String getDatabase() {

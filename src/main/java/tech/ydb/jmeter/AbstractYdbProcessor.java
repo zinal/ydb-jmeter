@@ -24,7 +24,7 @@ public abstract class AbstractYdbProcessor extends AbstractYdbTestElement {
         }
         try {
             YdbConnection conn = YdbConfigElement.getConnection(getDataSource());
-            execute(conn.getRetryCtx());
+            execute(conn);
         } catch(Exception ex) {
             LOG.error("Processing failed on {}", getName(), ex);
         }

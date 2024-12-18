@@ -15,8 +15,9 @@ import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.save.CSVSaveService;
 import org.apache.jmeter.threads.JMeterVariables;
 
+import tech.ydb.common.transaction.TxMode;
 import tech.ydb.core.grpc.GrpcReadStream;
-import tech.ydb.table.SessionRetryContext;
+import tech.ydb.query.tools.QueryReader;
 import tech.ydb.table.query.DataQueryResult;
 import tech.ydb.table.query.Params;
 import tech.ydb.table.result.ResultSetReader;
@@ -49,12 +50,15 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
 
     // Query types (used to communicate with GUI)
     // N.B. These must not be changed, as they are used in the JMX files
+    public static final String QUERYSERVICE   = "Query Service";
     public static final String DATAQUERY   = "Data Query";
     public static final String SCANQUERY   = "Scan Query";
     public static final String SCHEMEQUERY   = "Scheme Query";
     // Transaction modes
+    public static final String IMPLICIT = "Implicit";
     public static final String SERIALIZABLERW = "Serializable Read/Write";
     public static final String ONLINERO = "Online Read Only";
+    public static final String INCONSISTENTRO = "Online Inconsistent Read Only";
     public static final String STALERO = "Stale Read Only";
     public static final String SNAPSHOTRO = "Snapshot Read Only";
     // ResultSet store modes
@@ -78,41 +82,68 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
     /**
      * Execute the test element.
      *
-     * @param src a {@link SessionRetryContext}
+     * @param conn a {@link YdbConnection}
      * @return the result of the execute command
      */
-    protected YdbQueryResult execute(SessionRetryContext src) {
-        return execute(src, new SampleResult());
+    protected YdbQueryResult execute(YdbConnection conn) {
+        return execute(conn, new SampleResult());
     }
 
     /**
      * Execute the test element.
      * Use the sample given as argument to set time to first byte in the "latency" field of the SampleResult.
      *
-     * @param src a {@link SessionRetryContext}
+     * @param conn a {@link YdbConnection}
      * @param sample a {@link SampleResult} to save the latency
      * @return the result of the execute command
      */
-    protected YdbQueryResult execute(SessionRetryContext src, SampleResult sample) {
+    protected YdbQueryResult execute(YdbConnection conn, SampleResult sample) {
         LOG.debug("executing ydb: {}", getQuery());
         // Based on query return value, get results
         final String qt = getQueryType();
+        if (QUERYSERVICE.equals(qt)) {
+            return executeQuery(conn, sample);
+        }
         if (DATAQUERY.equals(qt)) {
-            return executeDataQuery(src, sample);
+            return executeDataQuery(conn, sample);
         }
         if (SCANQUERY.equals(qt)) {
-            return executeScanQuery(src, sample);
+            return executeScanQuery(conn, sample);
         }
         if (SCHEMEQUERY.equals(qt)) {
-            return executeSchemeQuery(src, sample);
+            return executeSchemeQuery(conn, sample);
         }
         // User provided incorrect query type
         throw new UnsupportedOperationException("Unexpected YDB query type: " + qt);
     }
 
-    private YdbQueryResult executeDataQuery(SessionRetryContext src, SampleResult sample) {
-        final YdbRetryHandler handler = new YdbRetryHandler(getName());
-        DataQueryResult dqr = src.supplyResult(handler,
+    private YdbQueryResult executeQuery(YdbConnection conn, SampleResult sample) {
+        QueryReader dqr = conn.getQueryRetryCtx().supplyResult(session ->
+                QueryReader.readFrom(session.createQuery(getQuery(), makeTxMode(), makeParams()))
+        ).join().getValue();
+        sample.latencyEnd();
+        final StringBuilder sb = new StringBuilder();
+        final int nrs = dqr.getResultSetCount();
+        int varPos = 0;
+        for (int irs = 0; irs < nrs; irs++) {
+            ResultSetReader rsr = dqr.getResultSet(irs);
+            sb.append("** Result set #").append(irs+1)
+                    .append(", ").append(rsr.getRowCount()).append(" row(s)");
+            if (rsr.isTruncated()) {
+                sb.append(" (TRUNCATED)");
+            }
+            sb.append("\n");
+            if (RS_STORE_AS_STRING.equalsIgnoreCase(getResultSetHandler())) {
+                appendColumns(sb, rsr);
+                appendRows(sb, rsr, 0);
+            }
+            varPos = storeVariables(rsr, varPos);
+        }
+        return new YdbQueryResult(sb.toString().getBytes(CHARSET));
+    }
+
+    private YdbQueryResult executeDataQuery(YdbConnection conn, SampleResult sample) {
+        DataQueryResult dqr = conn.getTableRetryCtx().supplyResult(
                 session -> session.executeDataQuery(getQuery(),
                         makeTxControl(), makeParams(), makeDataQuerySettings()))
                 .join().getValue();
@@ -134,10 +165,10 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
             }
             varPos = storeVariables(rsr, varPos);
         }
-        return new YdbQueryResult(sb.toString().getBytes(CHARSET), handler.getRetryCount());
+        return new YdbQueryResult(sb.toString().getBytes(CHARSET));
     }
 
-    private YdbQueryResult executeScanQuery(SessionRetryContext src, SampleResult sample) {
+    private YdbQueryResult executeScanQuery(YdbConnection conn, SampleResult sample) {
         // Input-output data for async operations
         class ScanQueryContext {
             boolean latencyEnd;
@@ -154,8 +185,7 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
         }
         sqc.storeVariables = true;
         sqc.totalRows = 0;
-        final YdbRetryHandler handler = new YdbRetryHandler(getName());
-        src.supplyStatus(handler, session -> {
+        conn.getTableRetryCtx().supplyStatus(session -> {
             GrpcReadStream<ResultSetReader> scan = session.executeScanQuery(getQuery(),
                     makeParams(), makeScanQuerySettings());
             return scan.start(rsr -> {
@@ -189,14 +219,15 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
         } else {
             data = ("** Total rows: " + Long.toString(sqc.totalRows)).getBytes(CHARSET);
         }
-        return new YdbQueryResult(data, handler.getRetryCount());
+        return new YdbQueryResult(data);
     }
 
-    private YdbQueryResult executeSchemeQuery(SessionRetryContext src, SampleResult sample) {
-        src.supplyStatus(session -> session.executeSchemeQuery(getQuery(), 
-                makeSchemeQuerySettings())).join().expectSuccess();
+    private YdbQueryResult executeSchemeQuery(YdbConnection conn, SampleResult sample) {
+        conn.getTableRetryCtx().supplyStatus(
+                session -> session.executeSchemeQuery(getQuery(), makeSchemeQuerySettings()))
+                .join().expectSuccess();
         sample.latencyEnd();
-        return new YdbQueryResult(new byte[0], 0);
+        return new YdbQueryResult();
     }
 
     private TxControl<?> makeTxControl() {
@@ -213,6 +244,28 @@ public abstract class AbstractYdbTestElement extends AbstractTestElement
             return TxControl.snapshotRo();
         }
         throw new IllegalArgumentException("Illegal value for TX control: " + txType);
+    }
+
+    private TxMode makeTxMode() {
+        if (IMPLICIT.equalsIgnoreCase(txType)) {
+            return TxMode.NONE;
+        }
+        if (SERIALIZABLERW.equalsIgnoreCase(txType)) {
+            return TxMode.SERIALIZABLE_RW;
+        }
+        if (STALERO.equalsIgnoreCase(txType)) {
+            return TxMode.STALE_RO;
+        }
+        if (SNAPSHOTRO.equalsIgnoreCase(txType)) {
+            return TxMode.SNAPSHOT_RO;
+        }
+        if (ONLINERO.equalsIgnoreCase(txType)) {
+            return TxMode.ONLINE_RO;
+        }
+        if (INCONSISTENTRO.equalsIgnoreCase(txType)) {
+            return TxMode.ONLINE_INCONSISTENT_RO;
+        }
+        throw new IllegalArgumentException("Illegal value for TX mode: " + txType);
     }
 
     private ExecuteDataQuerySettings makeDataQuerySettings() {

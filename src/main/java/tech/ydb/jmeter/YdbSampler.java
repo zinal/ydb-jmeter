@@ -61,13 +61,12 @@ public class YdbSampler extends AbstractYdbTestElement
             } finally {
                 res.connectEnd();
             }
-            YdbQueryResult result = execute(conn.getRetryCtx(), res);
+            YdbQueryResult result = execute(conn, res);
             res.setResponseData(result.getData());
             res.setResponseHeaders(YdbConfigElement.getConnectionInfo(dataSource));
-            res.setURL(result.makeURL());
         } catch (Exception ex) {
             res.setResponseMessage(YdbUtils.fullMessage(ex));
-            res.setResponseCode("000");
+            res.setResponseCode("500");
             res.setResponseData(
                     ObjectUtils.defaultIfNull(ex.getMessage(), "NO MESSAGE"),
                     res.getDataEncodingWithDefault());

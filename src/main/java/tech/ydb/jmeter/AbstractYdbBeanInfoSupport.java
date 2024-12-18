@@ -38,8 +38,10 @@ public abstract class AbstractYdbBeanInfoSupport extends BeanInfoSupport {
         p.setValue(DEFAULT, AbstractYdbTestElement.SERIALIZABLERW);
         p.setValue(NOT_OTHER, Boolean.TRUE);
         p.setValue(TAGS,new String[]{
+                AbstractYdbTestElement.IMPLICIT,
                 AbstractYdbTestElement.SERIALIZABLERW,
                 AbstractYdbTestElement.ONLINERO,
+                AbstractYdbTestElement.INCONSISTENTRO,
                 AbstractYdbTestElement.STALERO,
                 AbstractYdbTestElement.SNAPSHOTRO,
                 });
@@ -49,6 +51,7 @@ public abstract class AbstractYdbBeanInfoSupport extends BeanInfoSupport {
         p.setValue(DEFAULT, AbstractYdbTestElement.DATAQUERY);
         p.setValue(NOT_OTHER,Boolean.TRUE);
         p.setValue(TAGS,new String[]{
+                AbstractYdbTestElement.QUERYSERVICE,
                 AbstractYdbTestElement.DATAQUERY,
                 AbstractYdbTestElement.SCANQUERY,
                 AbstractYdbTestElement.SCHEMEQUERY,
