@@ -4,4 +4,5 @@
 *.bak
 nb-configuration.xml
 dependency-reduced-pom.xml
+.vscode/
 .DS_Store
