@@ -10,7 +10,7 @@ import tech.ydb.auth.iam.CloudAuthHelper;
 import tech.ydb.core.auth.StaticCredentials;
 import tech.ydb.core.grpc.GrpcTransport;
 import tech.ydb.core.grpc.GrpcTransportBuilder;
-import tech.ydb.table.SessionRetryContext;
+import tech.ydb.query.QueryClient;
 import tech.ydb.table.TableClient;
 
 /**
@@ -22,8 +22,10 @@ public class YdbConnection implements AutoCloseable {
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(YdbConnection.class);
 
     private final GrpcTransport transport;
+    private final QueryClient queryClient;
     private final TableClient tableClient;
-    private final SessionRetryContext retryCtx;
+    private final tech.ydb.table.SessionRetryContext tableCtx;
+    private final tech.ydb.query.tools.SessionRetryContext queryCtx;
     private final String endpoint;
     private final String database;
     private final YdbConfigElement.AuthMode authMode;
@@ -46,27 +48,36 @@ public class YdbConnection implements AutoCloseable {
                 break;
             case STATIC:
                 builder = builder.withAuthProvider(
-                    new StaticCredentials(config.getUsername(), config.getPassword()));
+                        new StaticCredentials(config.getUsername(), config.getPassword()));
                 break;
             case NONE:
                 break;
         }
         String tlsCertFile = config.getTlsCertFile();
-        if (! StringUtils.isEmpty(tlsCertFile)) {
+        if (!StringUtils.isEmpty(tlsCertFile)) {
             byte[] cert;
             try {
                 cert = Files.readAllBytes(Paths.get(tlsCertFile));
-            } catch(IOException ix) {
+            } catch (IOException ix) {
                 throw new RuntimeException("Failed to read file " + tlsCertFile, ix);
             }
             builder.withSecureConnection(cert);
         }
         GrpcTransport gt = builder.build();
         try {
-            this.tableClient = TableClient.newClient(gt)
+            this.queryClient = QueryClient.newClient(gt)
+                    .sessionPoolMinSize(1)
+                    .sessionPoolMaxSize(config.getPoolMaxInt())
+                    .build();
+            this.tableClient = QueryClient.newTableClient(gt)
                     .sessionPoolSize(1, config.getPoolMaxInt())
                     .build();
-            this.retryCtx = SessionRetryContext
+            this.queryCtx = tech.ydb.query.tools.SessionRetryContext
+                    .create(queryClient)
+                    .maxRetries(config.getRetriesMaxInt())
+                    .idempotent(true)
+                    .build();
+            this.tableCtx = tech.ydb.table.SessionRetryContext
                     .create(tableClient)
                     .maxRetries(config.getRetriesMaxInt())
                     .idempotent(true)
@@ -77,8 +88,9 @@ public class YdbConnection implements AutoCloseable {
             this.transport = gt;
             gt = null;
         } finally {
-            if (gt != null)
+            if (gt != null) {
                 gt.close();
+            }
         }
     }
 
@@ -86,8 +98,16 @@ public class YdbConnection implements AutoCloseable {
         return tableClient;
     }
 
-    public SessionRetryContext getRetryCtx() {
-        return retryCtx;
+    public QueryClient getQueryClient() {
+        return queryClient;
+    }
+
+    public tech.ydb.table.SessionRetryContext getTableCtx() {
+        return tableCtx;
+    }
+
+    public tech.ydb.query.tools.SessionRetryContext getQueryCtx() {
+        return queryCtx;
     }
 
     public String getDatabase() {
@@ -96,17 +116,24 @@ public class YdbConnection implements AutoCloseable {
 
     @Override
     public void close() {
+        if (queryClient != null) {
+            try {
+                queryClient.close();
+            } catch (Exception ex) {
+                LOG.warn("QueryClient closing threw an exception", ex);
+            }
+        }
         if (tableClient != null) {
             try {
                 tableClient.close();
-            } catch(Exception ex) {
+            } catch (Exception ex) {
                 LOG.warn("TableClient closing threw an exception", ex);
             }
         }
         if (transport != null) {
             try {
                 transport.close();
-            } catch(Exception ex) {
+            } catch (Exception ex) {
                 LOG.warn("GrpcTransport closing threw an exception", ex);
             }
         }
@@ -115,8 +142,8 @@ public class YdbConnection implements AutoCloseable {
     public String getConnectionInfo() {
         StringBuilder builder = new StringBuilder(100);
         builder.append(", endpoint:").append(endpoint)
-            .append(", database:").append(database)
-            .append(", authMode:").append(authMode.name());
+                .append(", database:").append(database)
+                .append(", authMode:").append(authMode.name());
         return builder.toString();
     }
 
